@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LDZ Constructora — Acceso</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --azul:#4e6371;--azul-dk:#3a4d59;--azul-lt:#d6dde2;
+  --naranja:#d2543b;--nrj-lt:#f5e8e4;
+  --gris:#b2b6b0;--gris-lt:#f0f1ef;--gris-dk:#6b6f6a;
+  --bg:#f4f5f3;--texto:#2c3130;--texto-s:#6b6f6a;
+  --ok:#3a7d5c;--err:#a03030;--err-bg:#fce8e8;
+  --font-h:'Oswald',sans-serif;--font-b:'Jost',sans-serif;
+  --radius:6px;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-b);background:var(--azul);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:white;border-radius:12px;padding:40px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.logo{text-align:center;margin-bottom:32px}
+.logo svg{display:block;margin:0 auto}
+.logo-sub{font-family:var(--font-h);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gris-dk);margin-top:8px}
+h1{font-family:var(--font-h);font-size:20px;font-weight:500;color:var(--azul);letter-spacing:1px;margin-bottom:24px;text-align:center}
+.field{margin-bottom:16px}
+label{display:block;font-family:var(--font-h);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--texto-s);margin-bottom:6px}
+input{width:100%;padding:10px 12px;font-family:var(--font-b);font-size:14px;color:var(--texto);background:white;border:1px solid var(--azul-lt);border-radius:var(--radius);outline:none;transition:border-color .15s}
+input:focus{border-color:var(--azul)}
+.btn-login{width:100%;padding:12px;font-family:var(--font-h);font-size:14px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;background:var(--azul);color:white;border:none;border-radius:var(--radius);cursor:pointer;transition:background .15s;margin-top:8px}
+.btn-login:hover{background:var(--azul-dk)}
+.btn-login:disabled{background:var(--gris);cursor:not-allowed}
+.error{background:var(--err-bg);color:var(--err);font-size:12px;padding:10px 12px;border-radius:var(--radius);margin-top:12px;display:none}
+.spinner{display:none;text-align:center;margin-top:12px;color:var(--texto-s);font-size:13px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="80" height="52" viewBox="0 0 80 52" xmlns="http://www.w3.org/2000/svg">
+      <rect width="80" height="52" rx="6" fill="#4e6371"/>
+      <text x="40" y="32" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="22" font-weight="400" fill="#b2b6b0" letter-spacing="4">LDZ</text>
+      <text x="40" y="44" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="7" font-weight="400" fill="#d2543b" letter-spacing="3.5">CONSTRUCTORA</text>
+    </svg>
+  </div>
+  <h1>Hojas de Ruta</h1>
+  <div class="field">
+    <label>Email</label>
+    <input type="email" id="email" placeholder="tucorreo@ldz.cl" autocomplete="email">
+  </div>
+  <div class="field">
+    <label>Contraseña</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="btn-login" id="btn-login" onclick="login()">Ingresar</button>
+  <div class="error" id="error-msg"></div>
+  <div class="spinner" id="spinner">Ingresando...</div>
+</div>
+
+<script>
+// ── CONFIGURACIÓN SUPABASE ──────────────────────────────────────────────────
+// Reemplaza estos valores con los de tu proyecto Supabase
+const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
+const SUPABASE_KEY = 'TU_ANON_KEY';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Redirigir si ya hay sesión activa
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) window.location.href = 'app.html';
+}
+checkSession();
+
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('error-msg');
+  const spinner = document.getElementById('spinner');
+
+  if (!email || !password) {
+    mostrarError('Por favor ingresa tu email y contraseña.');
+    return;
+  }
+
+  btn.disabled = true;
+  err.style.display = 'none';
+  spinner.style.display = 'block';
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+
+  spinner.style.display = 'none';
+  btn.disabled = false;
+
+  if (error) {
+    mostrarError('Email o contraseña incorrectos. Intenta de nuevo.');
+  } else {
+    window.location.href = 'app.html';
+  }
+}
+
+function mostrarError(msg) {
+  const err = document.getElementById('error-msg');
+  err.textContent = msg;
+  err.style.display = 'block';
+}
+
+// Login con Enter
+document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>
