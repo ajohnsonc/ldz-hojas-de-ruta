@@ -68,7 +68,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Redirigir si ya hay sesión activa
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session) window.location.href = 'app.html';
+  if (session) window.location.href = '/app.html';
 }
 checkSession();
 
