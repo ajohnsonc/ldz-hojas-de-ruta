@@ -350,7 +350,7 @@ const CLS  = {ok:'c-ok',obs:'c-warn',pend:'c-pend',nd:'c-nd'};
 async function init() {
   // Verificar sesión
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
+ if (!session) { window.location.href = '/'; return; }
 
   // Obtener perfil del usuario
   const { data: perfil } = await sb.from('usuarios')
