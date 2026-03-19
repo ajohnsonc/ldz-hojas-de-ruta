@@ -400,6 +400,7 @@ async function cargarDatos() {
         estado: a.estado,
         usuario_nombre: a.usuario_nombre,
         obs: a.observacion,
+        items_estado: a.items_estado || [],
         fecha: a.updated_at ? new Date(a.updated_at).toLocaleDateString('es-CL') : ''
       };
     });
@@ -599,8 +600,11 @@ function renderModalBody() {
         // Si ya está aprobado (ok/obs), mostrar estado final guardado
         if (estado === 'ok') { okCount++; return `<div class="check-item-row"><span style="color:var(--ok);margin-right:8px;font-size:15px">✓</span><span class="check-item-nombre">${item.n}</span></div>`; }
         if (estado === 'obs') {
-          // En obs: ✓ si estaba chequeado, ✗ si no
-          const chk = checks[idx];
+          // Usar items_estado guardado en Supabase si existe, sino usar checks locales
+          const itemsGuardados = (apr && apr.items_estado && apr.items_estado.length > 0)
+            ? apr.items_estado
+            : checks;
+          const chk = itemsGuardados[idx] !== false && itemsGuardados[idx] !== undefined ? itemsGuardados[idx] : true;
           if (chk) okCount++;
           return `<div class="check-item-row"><span style="color:${chk?'var(--ok)':'var(--err)'};margin-right:8px;font-size:15px">${chk?'✓':'✗'}</span><span class="check-item-nombre">${item.n}</span></div>`;
         }
@@ -697,21 +701,22 @@ function toggleObs(safeId) {
 }
 
 async function aprobarTodo(epId, rol, safeId) {
-  // Marcar todos los ítems como chequeados
   const total = (ITEMS[rol] || []).length;
   CHECKS_LOCALES[safeId] = new Array(total).fill(true);
-  await guardarAprobacion(epId, rol, 'ok', '');
+  await guardarAprobacion(epId, rol, 'ok', '', CHECKS_LOCALES[safeId]);
 }
 
 async function aprobarConObs(epId, rol, safeId) {
   const obs = document.getElementById('obs-txt-' + safeId).value.trim();
   if (!obs) { alert('Por favor escribe la observación antes de confirmar.'); return; }
-  // Los ítems no chequeados quedan como ✗ — se guarda el estado de checks locales
-  // junto con la observación
-  await guardarAprobacion(epId, rol, 'obs', obs);
+  const checks = CHECKS_LOCALES[safeId] || new Array((ITEMS[rol]||[]).length).fill(false);
+  await guardarAprobacion(epId, rol, 'obs', obs, checks);
 }
 
-async function guardarAprobacion(epId, rol, estado, obs) {
+async function guardarAprobacion(epId, rol, estado, obs, itemsEstado) {
+  const safeId = `${epId}_${rol.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  const checks = itemsEstado || CHECKS_LOCALES[safeId] || [];
+
   const { error } = await sb.from('aprobaciones').upsert({
     ep_id: parseInt(epId),
     rol: rol,
@@ -719,6 +724,7 @@ async function guardarAprobacion(epId, rol, estado, obs) {
     observacion: obs,
     usuario_id: USUARIO.id,
     usuario_nombre: USUARIO.nombre,
+    items_estado: checks.length > 0 ? checks : null,
     updated_at: new Date().toISOString()
   }, { onConflict: 'ep_id,rol' });
 
@@ -728,6 +734,7 @@ async function guardarAprobacion(epId, rol, estado, obs) {
   if (!APROBACIONES[epId]) APROBACIONES[epId] = {};
   APROBACIONES[epId][rol] = {
     estado, obs,
+    items_estado: checks,
     usuario_nombre: USUARIO.nombre,
     fecha: new Date().toLocaleDateString('es-CL')
   };
