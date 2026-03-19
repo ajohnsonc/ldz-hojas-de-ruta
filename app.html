@@ -604,7 +604,7 @@ function renderModalBody() {
           const itemsGuardados = (apr && apr.items_estado && apr.items_estado.length > 0)
             ? apr.items_estado
             : checks;
-          const chk = itemsGuardados[idx] !== false && itemsGuardados[idx] !== undefined ? itemsGuardados[idx] : true;
+          const chk = itemsGuardados && itemsGuardados.length > idx ? !!itemsGuardados[idx] : false;
           if (chk) okCount++;
           return `<div class="check-item-row"><span style="color:${chk?'var(--ok)':'var(--err)'};margin-right:8px;font-size:15px">${chk?'✓':'✗'}</span><span class="check-item-nombre">${item.n}</span></div>`;
         }
@@ -709,7 +709,10 @@ async function aprobarTodo(epId, rol, safeId) {
 async function aprobarConObs(epId, rol, safeId) {
   const obs = document.getElementById('obs-txt-' + safeId).value.trim();
   if (!obs) { alert('Por favor escribe la observación antes de confirmar.'); return; }
-  const checks = CHECKS_LOCALES[safeId] || new Array((ITEMS[rol]||[]).length).fill(false);
+  const total = (ITEMS[rol]||[]).length;
+  // Si no hay checks locales inicializados, todos quedan false
+  if (!CHECKS_LOCALES[safeId]) CHECKS_LOCALES[safeId] = new Array(total).fill(false);
+  const checks = CHECKS_LOCALES[safeId];
   await guardarAprobacion(epId, rol, 'obs', obs, checks);
 }
 
