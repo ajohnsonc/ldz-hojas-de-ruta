@@ -356,7 +356,7 @@ async function init() {
   const { data: perfil } = await sb.from('usuarios')
     .select('*').eq('id', session.user.id).single();
 
-  if (!perfil) { window.location.href = 'index.html'; return; }
+  if (!perfil) { window.location.href = '/'; return; }
 
   USUARIO = perfil;
 
@@ -722,7 +722,7 @@ function closeModal(e) {
 // ── CERRAR SESIÓN ────────────────────────────────────────────────────────────
 async function cerrarSesion() {
   await sb.auth.signOut();
-  window.location.href = 'index.html';
+  window.location.href = '/';
 }
 
 // ── EXCEL / PDF ──────────────────────────────────────────────────────────────
