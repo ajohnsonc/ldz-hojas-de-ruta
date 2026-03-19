@@ -301,8 +301,8 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--texto);font-size
 
 <script>
 // ── CONFIGURACIÓN SUPABASE ──────────────────────────────────────────────────
-const SUPABASE_URL = 'https://kurfctbusjtdjetvpgpi.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1cmZjdGJ1c2p0ZGpldHZwZ3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NDkzNzcsImV4cCI6MjA4OTQyNTM3N30.5rrqTf2l4G-p-VnefcMfa43cX0MhHE2oxrwKVHBh9aY';
+const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
+const SUPABASE_KEY = 'TU_ANON_KEY';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -350,7 +350,7 @@ const CLS  = {ok:'c-ok',obs:'c-warn',pend:'c-pend',nd:'c-nd'};
 async function init() {
   // Verificar sesión
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = '/'; return; }
+  if (!session) { window.location.href = 'index.html'; return; }
 
   // Obtener perfil del usuario
   const { data: perfil } = await sb.from('usuarios')
@@ -583,6 +583,34 @@ function renderModalBody() {
       // ¿Puede este usuario aprobar este rol?
       const puedeAprobar = !esND && USUARIO.rol === rol;
 
+      // ID seguro para el formulario (sin espacios ni puntos)
+      const safeId = `${epId}_${rol.replace(/[^a-zA-Z0-9]/g,'_')}`;
+
+      // Contar ítems
+      const itemsHtml = (ITEMS[rol]||[]).map(item => {
+        tot++;
+        const chk = estado === 'ok' || estado === 'obs';
+        if (chk) okCount++;
+        return `<div class="check-item-row">
+          <span style="color:${chk?'var(--ok)':esND?'var(--gris)':'var(--azul-lt)'};margin-right:8px;font-size:15px">${chk?'✓':'○'}</span>
+          <span class="check-item-nombre">${item.n}</span>
+        </div>`;
+      }).join('');
+
+      // Botones de acción — solo si puede aprobar y está pendiente
+      const botonesHtml = puedeAprobar && estado === 'pend' ? `
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn-check btn-aprobar" onclick="aprobar(${epId},'${rol}')">✓ Aprobar todo</button>
+          <button class="btn-check btn-obs" onclick="toggleObs('${safeId}')">⚠ Aprobar con observación</button>
+        </div>
+        <div id="obs-form-${safeId}" style="display:none;margin-top:10px">
+          <textarea class="obs-input" id="obs-txt-${safeId}" placeholder="Describe qué está pendiente u observado..."></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn-check btn-obs" onclick="aprobarConObs(${epId},'${rol}','${safeId}')">Confirmar con observación</button>
+            <button class="btn-check" style="background:var(--gris-lt);color:var(--gris-dk);border-color:var(--gris);border:1px solid" onclick="toggleObs('${safeId}')">Cancelar</button>
+          </div>
+        </div>` : '';
+
       html += `<div style="border:1px solid var(--azul-lt);border-radius:6px;margin-bottom:10px;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--gris-lt);${bg}">
           <span class="${CLS[estado]}" style="font-size:16px">${ICON[estado]}</span>
@@ -591,29 +619,8 @@ function renderModalBody() {
           ${apr && apr.obs ? `<span class="obs-txt"> — ${apr.obs}</span>` : ''}
         </div>
         <div style="padding:8px 12px;">
-          ${(ITEMS[rol]||[]).map(item => {
-            tot++;
-            const chk = estado === 'ok' || estado === 'obs';
-            if (chk) okCount++;
-            return `<div class="check-item-row">
-              <span class="check-item-nombre">
-                <span style="color:${chk?'var(--ok)':esND?'var(--gris)':'var(--gris)'};margin-right:8px">${chk?'✓':'○'}</span>
-                ${item.n}
-              </span>
-            </div>`;
-          }).join('')}
-          ${puedeAprobar && estado === 'pend' ? `
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn-check btn-aprobar" onclick="aprobar('${epId}','${rol}')">✓ Aprobar todo</button>
-            <button class="btn-check btn-obs" onclick="mostrarObs('${epId}','${rol}')">⚠ Aprobar con observación</button>
-          </div>
-          <div id="obs-form-${epId}-${rol.replace(/ /g,'_')}" style="display:none;margin-top:8px">
-            <textarea class="obs-input" id="obs-txt-${epId}-${rol.replace(/ /g,'_')}" placeholder="Escribe la observación..."></textarea>
-            <div style="display:flex;gap:8px;margin-top:6px">
-              <button class="btn-check btn-obs" onclick="aprobarConObs('${epId}','${rol}')">Confirmar con obs.</button>
-              <button class="btn-check" style="background:var(--gris-lt);color:var(--gris-dk);border-color:var(--gris)" onclick="ocultarObs('${epId}','${rol}')">Cancelar</button>
-            </div>
-          </div>` : ''}
+          ${itemsHtml}
+          ${botonesHtml}
         </div>
       </div>`;
     });
@@ -641,16 +648,14 @@ async function aprobar(epId, rol) {
   await guardarAprobacion(epId, rol, 'ok', '');
 }
 
-function mostrarObs(epId, rol) {
-  document.getElementById(`obs-form-${epId}-${rol.replace(/ /g,'_')}`).style.display = 'block';
-}
-function ocultarObs(epId, rol) {
-  document.getElementById(`obs-form-${epId}-${rol.replace(/ /g,'_')}`).style.display = 'none';
+function toggleObs(safeId) {
+  const el = document.getElementById('obs-form-' + safeId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-async function aprobarConObs(epId, rol) {
-  const obs = document.getElementById(`obs-txt-${epId}-${rol.replace(/ /g,'_')}`).value.trim();
-  if (!obs) { alert('Por favor escribe la observación.'); return; }
+async function aprobarConObs(epId, rol, safeId) {
+  const obs = document.getElementById('obs-txt-' + safeId).value.trim();
+  if (!obs) { alert('Por favor escribe la observación antes de confirmar.'); return; }
   await guardarAprobacion(epId, rol, 'obs', obs);
 }
 
