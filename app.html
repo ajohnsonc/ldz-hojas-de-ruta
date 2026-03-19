@@ -350,7 +350,7 @@ const CLS  = {ok:'c-ok',obs:'c-warn',pend:'c-pend',nd:'c-nd'};
 async function init() {
   // Verificar sesión
   const { data: { session } } = await sb.auth.getSession();
- if (!session) { window.location.href = '/'; return; }
+  if (!session) { window.location.href = '/'; return; }
 
   // Obtener perfil del usuario
   const { data: perfil } = await sb.from('usuarios')
@@ -569,7 +569,6 @@ function renderModalBody() {
 
   ETAPAS_DEF.forEach(et => {
     html += `<div class="sec-tit">${et.t}<span class="etag ${et.tag}">${et.t.split('—')[0].trim()}</span></div>`;
-
     if (et.roles.includes('Adm. Obra')) {
       html += `<div class="nota-adm"><span style="font-size:15px">ⓘ</span><span>Solo el Administrador de Obra puede enviar a Finanzas, incluso con observaciones o información faltante.</span></div>`;
     }
@@ -578,44 +577,51 @@ function renderModalBody() {
       const estado = getEstadoNd(epId, rol);
       const apr = (APROBACIONES[epId] || {})[rol];
       const esND = estado === 'nd';
-      const bg = {obs:'background:color-mix(in srgb,var(--warn-bg) 30%,white)',ok:'background:color-mix(in srgb,var(--ok-bg) 20%,white)'}[estado] || '';
-
-      // ¿Puede este usuario aprobar este rol?
-      const puedeAprobar = !esND && USUARIO.rol === rol;
-
-      // ID seguro para el formulario (sin espacios ni puntos)
+      const puedeAprobar = !esND && USUARIO.rol === rol && estado === 'pend';
       const safeId = `${epId}_${rol.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      const bg = estado==='obs' ? 'background:color-mix(in srgb,var(--warn-bg) 30%,white)'
+               : estado==='ok'  ? 'background:color-mix(in srgb,var(--ok-bg) 20%,white)' : '';
 
-      // Contar ítems
-      const itemsHtml = (ITEMS[rol]||[]).map(item => {
+      // Ítems del checklist — cada uno con checkbox individual si puede aprobar
+      const itemsHtml = (ITEMS[rol]||[]).map((item, idx) => {
         tot++;
         const chk = estado === 'ok' || estado === 'obs';
         if (chk) okCount++;
-        return `<div class="check-item-row">
-          <span style="color:${chk?'var(--ok)':esND?'var(--gris)':'var(--azul-lt)'};margin-right:8px;font-size:15px">${chk?'✓':'○'}</span>
-          <span class="check-item-nombre">${item.n}</span>
-        </div>`;
+        const itemSafeId = `${safeId}_${idx}`;
+        // Si puede aprobar: checkbox clickeable; si no: solo icono
+        if (puedeAprobar) {
+          return `<div class="check-item-row" id="item-row-${itemSafeId}" style="cursor:pointer" onclick="event.stopPropagation();toggleItem('${itemSafeId}')">
+            <span id="item-icon-${itemSafeId}" style="color:var(--gris);margin-right:8px;font-size:15px;transition:color .15s">○</span>
+            <span class="check-item-nombre">${item.n}</span>
+          </div>`;
+        } else {
+          return `<div class="check-item-row">
+            <span style="color:${chk?'var(--ok)':esND?'var(--gris)':'var(--gris)'};margin-right:8px;font-size:15px">${chk?'✓':'○'}</span>
+            <span class="check-item-nombre">${item.n}</span>
+          </div>`;
+        }
       }).join('');
 
-      // Botones de acción — solo si puede aprobar y está pendiente
-      const botonesHtml = puedeAprobar && estado === 'pend' ? `
+      // Botones — solo si puede aprobar
+      const totalItems = (ITEMS[rol]||[]).length;
+      const botonesHtml = puedeAprobar ? `
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn-check btn-aprobar" onclick="aprobar(${epId},'${rol}')">✓ Aprobar todo</button>
-          <button class="btn-check btn-obs" onclick="toggleObs('${safeId}')">⚠ Aprobar con observación</button>
+          <button class="btn-check btn-aprobar" onclick="event.stopPropagation();aprobar(${epId},'${rol}')">✓ Aprobar todo</button>
+          <button class="btn-check btn-obs" onclick="event.stopPropagation();toggleObs('${safeId}')">⚠ Aprobar con observación</button>
         </div>
-        <div id="obs-form-${safeId}" style="display:none;margin-top:10px">
+        <div id="obs-form-${safeId}" style="display:none;margin-top:10px" onclick="event.stopPropagation()">
           <textarea class="obs-input" id="obs-txt-${safeId}" placeholder="Describe qué está pendiente u observado..."></textarea>
           <div style="display:flex;gap:8px;margin-top:6px">
-            <button class="btn-check btn-obs" onclick="aprobarConObs(${epId},'${rol}','${safeId}')">Confirmar con observación</button>
-            <button class="btn-check" style="background:var(--gris-lt);color:var(--gris-dk);border-color:var(--gris);border:1px solid" onclick="toggleObs('${safeId}')">Cancelar</button>
+            <button class="btn-check btn-obs" onclick="event.stopPropagation();aprobarConObs(${epId},'${rol}','${safeId}')">Confirmar con observación</button>
+            <button class="btn-check" style="background:var(--gris-lt);color:var(--gris-dk);border:1px solid var(--gris)" onclick="event.stopPropagation();toggleObs('${safeId}')">Cancelar</button>
           </div>
         </div>` : '';
 
-      html += `<div style="border:1px solid var(--azul-lt);border-radius:6px;margin-bottom:10px;overflow:hidden;">
+      html += `<div style="border:1px solid var(--azul-lt);border-radius:6px;margin-bottom:10px;overflow:hidden;" onclick="event.stopPropagation()">
         <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--gris-lt);${bg}">
           <span class="${CLS[estado]}" style="font-size:16px">${ICON[estado]}</span>
           <span style="font-family:var(--font-h);font-size:13px;font-weight:500;letter-spacing:.8px;color:var(--azul)">${rol}</span>
-          ${apr && apr.usuario_nombre ? `<span class="aprobado-por">✓ ${apr.usuario_nombre}${apr.fecha ? ' · '+apr.fecha : ''}</span>` : ''}
+          ${apr && apr.usuario_nombre ? `<span class="aprobado-por">✓ ${apr.usuario_nombre}${apr.fecha?' · '+apr.fecha:''}</span>` : ''}
           ${apr && apr.obs ? `<span class="obs-txt"> — ${apr.obs}</span>` : ''}
         </div>
         <div style="padding:8px 12px;">
@@ -633,7 +639,6 @@ function renderModalBody() {
       <div class="progreso-bar"><div class="progreso-fill" style="width:${pct}%"></div></div>
     </div>` + html;
 
-  // Botón pagar — solo Finanzas y solo si está todo aprobado
   const est = globalEst(epId);
   const puedePagar = (est === 'ok' || est === 'obs') && USUARIO.rol === 'Finanzas';
   document.getElementById('m-pagar-wrap').innerHTML = (est === 'ok' || est === 'obs')
@@ -651,6 +656,16 @@ async function aprobar(epId, rol) {
 function toggleObs(safeId) {
   const el = document.getElementById('obs-form-' + safeId);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleItem(itemSafeId) {
+  const icon = document.getElementById('item-icon-' + itemSafeId);
+  const row = document.getElementById('item-row-' + itemSafeId);
+  if (!icon) return;
+  const checked = icon.textContent === '✓';
+  icon.textContent = checked ? '○' : '✓';
+  icon.style.color = checked ? 'var(--gris)' : 'var(--ok)';
+  row.style.background = checked ? '' : 'color-mix(in srgb,var(--ok-bg) 30%,white)';
 }
 
 async function aprobarConObs(epId, rol, safeId) {
