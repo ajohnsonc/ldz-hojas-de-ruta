@@ -563,6 +563,14 @@ function openModal(epId) {
   document.getElementById('overlay').classList.add('open');
 }
 
+// Checks locales en memoria: {safeId: [true/false, ...]}
+const CHECKS_LOCALES = {};
+
+function getChecksLocales(safeId, total) {
+  if (!CHECKS_LOCALES[safeId]) CHECKS_LOCALES[safeId] = new Array(total).fill(false);
+  return CHECKS_LOCALES[safeId];
+}
+
 function renderModalBody() {
   const epId = EP_MODAL.id;
   let tot = 0, okCount = 0, html = '';
@@ -579,40 +587,50 @@ function renderModalBody() {
       const esND = estado === 'nd';
       const puedeAprobar = !esND && USUARIO.rol === rol && estado === 'pend';
       const safeId = `${epId}_${rol.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      const items = ITEMS[rol] || [];
+      const checks = getChecksLocales(safeId, items.length);
+
       const bg = estado==='obs' ? 'background:color-mix(in srgb,var(--warn-bg) 30%,white)'
                : estado==='ok'  ? 'background:color-mix(in srgb,var(--ok-bg) 20%,white)' : '';
 
-      // Ítems del checklist — cada uno con checkbox individual si puede aprobar
-      const itemsHtml = (ITEMS[rol]||[]).map((item, idx) => {
+      const itemsHtml = items.map((item, idx) => {
         tot++;
-        const chk = estado === 'ok' || estado === 'obs';
-        if (chk) okCount++;
-        const itemSafeId = `${safeId}_${idx}`;
-        // Si puede aprobar: checkbox clickeable; si no: solo icono
+        // Si ya está aprobado (ok/obs), mostrar estado final guardado
+        if (estado === 'ok') { okCount++; return `<div class="check-item-row"><span style="color:var(--ok);margin-right:8px;font-size:15px">✓</span><span class="check-item-nombre">${item.n}</span></div>`; }
+        if (estado === 'obs') {
+          // En obs: ✓ si estaba chequeado, ✗ si no
+          const chk = checks[idx];
+          if (chk) okCount++;
+          return `<div class="check-item-row"><span style="color:${chk?'var(--ok)':'var(--err)'};margin-right:8px;font-size:15px">${chk?'✓':'✗'}</span><span class="check-item-nombre">${item.n}</span></div>`;
+        }
+        if (esND) return `<div class="check-item-row"><span style="color:var(--gris);margin-right:8px;font-size:15px">—</span><span class="check-item-nombre" style="color:var(--gris-dk)">${item.n}</span></div>`;
+
+        // Pendiente y puede aprobar — checkbox interactivo
         if (puedeAprobar) {
-          return `<div class="check-item-row" id="item-row-${itemSafeId}" style="cursor:pointer" onclick="event.stopPropagation();toggleItem('${itemSafeId}')">
-            <span id="item-icon-${itemSafeId}" style="color:var(--gris);margin-right:8px;font-size:15px;transition:color .15s">○</span>
-            <span class="check-item-nombre">${item.n}</span>
-          </div>`;
-        } else {
-          return `<div class="check-item-row">
-            <span style="color:${chk?'var(--ok)':esND?'var(--gris)':'var(--gris)'};margin-right:8px;font-size:15px">${chk?'✓':'○'}</span>
+          const itemSafeId = `${safeId}_${idx}`;
+          const chk = checks[idx];
+          return `<div class="check-item-row" id="item-row-${itemSafeId}" style="cursor:pointer;background:${chk?'color-mix(in srgb,var(--ok-bg) 25%,white)':''}" onclick="event.stopPropagation();toggleItem('${safeId}',${idx})">
+            <span id="item-icon-${itemSafeId}" style="color:${chk?'var(--ok)':'var(--gris)'};margin-right:8px;font-size:15px;transition:color .15s">${chk?'✓':'○'}</span>
             <span class="check-item-nombre">${item.n}</span>
           </div>`;
         }
+
+        // Pendiente pero no puede aprobar — solo ver
+        return `<div class="check-item-row"><span style="color:var(--gris);margin-right:8px;font-size:15px">○</span><span class="check-item-nombre">${item.n}</span></div>`;
       }).join('');
 
-      // Botones — solo si puede aprobar
-      const totalItems = (ITEMS[rol]||[]).length;
+      // Botones solo si puede aprobar
       const botonesHtml = puedeAprobar ? `
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn-check btn-aprobar" onclick="event.stopPropagation();aprobar(${epId},'${rol}')">✓ Aprobar todo</button>
-          <button class="btn-check btn-obs" onclick="event.stopPropagation();toggleObs('${safeId}')">⚠ Aprobar con observación</button>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;border-top:1px solid var(--gris-lt);padding-top:10px">
+          <button class="btn-check" style="background:var(--azul-lt);color:var(--azul);border:1px solid var(--azul)" onclick="event.stopPropagation();guardarProgreso('${safeId}',${epId},'${rol}')">💾 Guardar progreso</button>
+          <button class="btn-check btn-aprobar" onclick="event.stopPropagation();aprobarTodo(${epId},'${rol}','${safeId}')">✓ Aprobar todo</button>
+          <button class="btn-check btn-obs" onclick="event.stopPropagation();toggleObs('${safeId}')">⚠ Enviar con observación</button>
         </div>
-        <div id="obs-form-${safeId}" style="display:none;margin-top:10px" onclick="event.stopPropagation()">
+        <div id="obs-form-${safeId}" style="display:none;margin-top:10px;padding:10px;background:var(--warn-bg);border-radius:var(--radius)" onclick="event.stopPropagation()">
+          <div style="font-family:var(--font-h);font-size:11px;letter-spacing:.5px;color:var(--warn);margin-bottom:6px">OBSERVACIÓN — los ítems no chequeados quedarán marcados con ✗</div>
           <textarea class="obs-input" id="obs-txt-${safeId}" placeholder="Describe qué está pendiente u observado..."></textarea>
           <div style="display:flex;gap:8px;margin-top:6px">
-            <button class="btn-check btn-obs" onclick="event.stopPropagation();aprobarConObs(${epId},'${rol}','${safeId}')">Confirmar con observación</button>
+            <button class="btn-check btn-obs" onclick="event.stopPropagation();aprobarConObs(${epId},'${rol}','${safeId}')">Enviar con observación</button>
             <button class="btn-check" style="background:var(--gris-lt);color:var(--gris-dk);border:1px solid var(--gris)" onclick="event.stopPropagation();toggleObs('${safeId}')">Cancelar</button>
           </div>
         </div>` : '';
@@ -649,8 +667,27 @@ function renderModalBody() {
 }
 
 // ── APROBAR ─────────────────────────────────────────────────────────────────
-async function aprobar(epId, rol) {
-  await guardarAprobacion(epId, rol, 'ok', '');
+
+function toggleItem(safeId, idx) {
+  const checks = getChecksLocales(safeId, (ITEMS[safeId.split('_').slice(2).join('_')] || []).length);
+  // Buscar items del rol a partir del safeId — más simple: buscar directamente
+  const itemSafeId = `${safeId}_${idx}`;
+  const icon = document.getElementById('item-icon-' + itemSafeId);
+  const row = document.getElementById('item-row-' + itemSafeId);
+  if (!icon) return;
+  const checked = icon.textContent === '✓';
+  CHECKS_LOCALES[safeId][idx] = !checked;
+  icon.textContent = checked ? '○' : '✓';
+  icon.style.color = checked ? 'var(--gris)' : 'var(--ok)';
+  if (row) row.style.background = checked ? '' : 'color-mix(in srgb,var(--ok-bg) 25%,white)';
+}
+
+function guardarProgreso(safeId, epId, rol) {
+  // Los checks ya están en CHECKS_LOCALES, solo confirmamos al usuario
+  const checks = CHECKS_LOCALES[safeId] || [];
+  const chequeados = checks.filter(Boolean).length;
+  const total = (ITEMS[rol] || []).length;
+  alert(`Progreso guardado: ${chequeados} de ${total} ítems marcados.\nPuedes cerrar y volver cuando quieras continuar.`);
 }
 
 function toggleObs(safeId) {
@@ -658,19 +695,18 @@ function toggleObs(safeId) {
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-function toggleItem(itemSafeId) {
-  const icon = document.getElementById('item-icon-' + itemSafeId);
-  const row = document.getElementById('item-row-' + itemSafeId);
-  if (!icon) return;
-  const checked = icon.textContent === '✓';
-  icon.textContent = checked ? '○' : '✓';
-  icon.style.color = checked ? 'var(--gris)' : 'var(--ok)';
-  row.style.background = checked ? '' : 'color-mix(in srgb,var(--ok-bg) 30%,white)';
+async function aprobarTodo(epId, rol, safeId) {
+  // Marcar todos los ítems como chequeados
+  const total = (ITEMS[rol] || []).length;
+  CHECKS_LOCALES[safeId] = new Array(total).fill(true);
+  await guardarAprobacion(epId, rol, 'ok', '');
 }
 
 async function aprobarConObs(epId, rol, safeId) {
   const obs = document.getElementById('obs-txt-' + safeId).value.trim();
   if (!obs) { alert('Por favor escribe la observación antes de confirmar.'); return; }
+  // Los ítems no chequeados quedan como ✗ — se guarda el estado de checks locales
+  // junto con la observación
   await guardarAprobacion(epId, rol, 'obs', obs);
 }
 
