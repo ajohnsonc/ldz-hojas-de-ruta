@@ -259,7 +259,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--texto);font-size
     </div>
     <div class="tcols thead">
       <div>Subcontratista</div>
-      <div class="th sep-e1">Legal</div>
+      <div class="th sep-e1">Contrato</div>
       <div class="th">Laboral</div>
       <div class="th">Prev.</div>
       <div class="th">Calidad</div>
@@ -314,25 +314,25 @@ let OBRA_ACTIVA = 'Todas';
 let EP_MODAL = null;
 
 // ── ROLES ───────────────────────────────────────────────────────────────────
-const ROLES = ['Legal','Laboral','Prevención','Calidad','J. Bodega','J. Terreno','Of. Técnica','Adm. Obra','Finanzas'];
-const SEP = {Legal:'sep-e1f','Of. Técnica':'sep-e2f','Adm. Obra':'sep-e3f',Finanzas:'sep-e4f'};
+const ROLES = ['Contrato','Laboral','Prevención','Calidad','J. Bodega','J. Terreno','Of. Técnica','Adm. Obra','Finanzas'];
+const SEP = {'Contrato':'sep-e1f','Of. Técnica':'sep-e2f','Adm. Obra':'sep-e3f',Finanzas:'sep-e4f'};
 
 // Qué rol puede aprobar qué etapa
 const ROL_ETAPA = {
-  'Legal':'e1','Laboral':'e1','Prevención':'e1','Calidad':'e1','J. Bodega':'e1','J. Terreno':'e1',
+  'Contrato':'e1','Laboral':'e1','Prevención':'e1','Calidad':'e1','J. Bodega':'e1','J. Terreno':'e1',
   'Of. Técnica':'e2','Adm. Obra':'e3','Finanzas':'e4'
 };
 
 // Etapas secuenciales — E2 requiere E1 completa, E3 requiere E2, E4 requiere E3
 const ETAPAS_DEF = [
-  {t:'Etapa 1 — Revisión paralela',tag:'tag-e1',key:'e1',roles:['Legal','Laboral','Prevención','Calidad','J. Bodega','J. Terreno']},
+  {t:'Etapa 1 — Revisión paralela',tag:'tag-e1',key:'e1',roles:['Contrato','Laboral','Prevención','Calidad','J. Bodega','J. Terreno']},
   {t:'Etapa 2 — Jefe de Oficina Técnica',tag:'tag-e2',key:'e2',roles:['Of. Técnica']},
   {t:'Etapa 3 — Administrador de Obra',tag:'tag-e3',key:'e3',roles:['Adm. Obra']},
   {t:'Etapa 4 — Finanzas',tag:'tag-e4',key:'e4',roles:['Finanzas']},
 ];
 
 const ITEMS = {
-  'Legal':[{n:'Contrato firmado por ambas partes'},{n:'Anexos firmados por ambas partes'},{n:'RUT empresa vigente'},{n:'Patente comercial al día'}],
+  'Contrato':[{n:'Contrato firmado por ambas partes'},{n:'Anexos firmados por ambas partes'}],
   'Laboral':[{n:'F30-1 (imposiciones pagadas)'},{n:'Control de asistencia'},{n:'Contratos firmados trabajadores'},{n:'Finiquitos al día'},{n:'Administrador RRHH visado'}],
   'Prevención':[{n:'Registro uso EPP'},{n:'Charlas diarias de seguridad'},{n:'Préstamo EPP documentado'},{n:'Participación charla AST (validar)'},{n:'Cumple normativa vigente'},{n:'Supervisor permanente en obra'},{n:'Elementos de seguridad en orden'}],
   'Calidad':[{n:'ECO al día'},{n:'Asistencia reuniones planificación (LPS)'},{n:'Cumplimiento planificación semanal (PAC)'},{n:'Protocolos al día'},{n:'Certificados de materiales entregados'}],
@@ -511,7 +511,7 @@ function renderTabla() {
 }
 
 function renderTarjetas() {
-  const RS = {Legal:'Legal',Laboral:'Laboral',Prevención:'Prev.',Calidad:'Calidad','J. Bodega':'Bodega','J. Terreno':'Terreno','Of. Técnica':'Of.Téc.','Adm. Obra':'Adm.Obra',Finanzas:'Finanzas'};
+  const RS = {'Contrato':'Contrato',Laboral:'Laboral',Prevención:'Prev.',Calidad:'Calidad','J. Bodega':'Bodega','J. Terreno':'Terreno','Of. Técnica':'Of.Téc.','Adm. Obra':'Adm.Obra',Finanzas:'Finanzas'};
   const visibles = EPS.filter(ep => epVisible(ep));
   document.getElementById('tarjetas-body').innerHTML = visibles.map(ep => {
     const est = globalEst(ep.id);
@@ -585,7 +585,8 @@ function renderModalBody() {
       const estado = getEstadoNd(epId, rol);
       const apr = (APROBACIONES[epId] || {})[rol];
       const esND = estado === 'nd';
-      const puedeAprobar = !esND && USUARIO.rol === rol && estado === 'pend';
+      const rolUsuario = USUARIO.rol;
+      const puedeAprobar = !esND && estado === 'pend' && (rolUsuario === rol || (rolUsuario === 'Of. Técnica' && rol === 'Contrato'));
       const safeId = `${epId}_${rol.replace(/[^a-zA-Z0-9]/g,'_')}`;
       const items = ITEMS[rol] || [];
       const checks = getChecksLocales(safeId, items.length);
@@ -781,7 +782,7 @@ function descargarExcel() {
   const q = document.getElementById('quincena-sel').value;
   const T = {ok:'Aprobado',obs:'Con observación',pend:'Pendiente',nd:'—'};
   let csv = '\uFEFF';
-  csv += 'N° EP,Subcontratista,Descripción,Obra,Tipo,Monto,Legal,Laboral,Prevención,Calidad,J.Bodega,J.Terreno,Of.Técnica,Adm.Obra,Finanzas,Estado\n';
+  csv += 'N° EP,Subcontratista,Descripción,Obra,Tipo,Monto,OT-Contractual,Laboral,Prevención,Calidad,J.Bodega,J.Terreno,Of.Técnica,Adm.Obra,Finanzas,Estado\n';
   EPS.filter(ep => epVisible(ep)).forEach(ep => {
     const est = globalEst(ep.id);
     const estT = {ok:'Listo',obs:'Con observación',proc:'En proceso'}[est];
